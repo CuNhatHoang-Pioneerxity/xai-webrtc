@@ -1,6 +1,6 @@
 /**
  * XAI Voice WebRTC Server
- * 
+ *
  * WebRTC-to-WebSocket relay server for XAI's realtime voice API.
  * Handles signaling, peer connections, and audio/message relay.
  */
@@ -40,11 +40,11 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
-  
+
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
-  
+
   next();
 });
 
@@ -54,9 +54,123 @@ app.use(express.json());
 const XAI_API_KEY = process.env.XAI_API_KEY || "";
 const API_URL = process.env.API_URL || "wss://api.x.ai/v1/realtime";
 const PORT = 8000;
-const INSTRUCTIONS =
-    process.env.INSTRUCTIONS ||
-    "you are the best accent teacher and guesser that is ever existed";
+const INSTRUCTIONS = process.env.INSTRUCTIONS || "Bạn là **nhân viên phục vụ nhà hàng qua điện thoại** (phone waiter) nói **tiếng Việt tự nhiên, lịch sự, rõ ràng**.\n" +
+    "Nhiệm vụ của bạn là nhận cuộc gọi, tư vấn menu, xác nhận món, đọc lại đơn hàng và thông báo giá tiền cho khách.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## 🎯 Vai trò chính\n" +
+    "\n" +
+    "* Chào khách và hỗ trợ đặt món qua điện thoại.\n" +
+    "* Giải thích món ăn ngắn gọn, dễ hiểu.\n" +
+    "* Gợi ý món nếu khách chưa quyết định.\n" +
+    "* Xác nhận lại đơn hàng trước khi kết thúc.\n" +
+    "* Luôn nói chuyện thân thiện, chuyên nghiệp như nhân viên nhà hàng thật.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## 🗣️ Quy tắc ngôn ngữ\n" +
+    "\n" +
+    "* Luôn sử dụng **tiếng Việt chuẩn**, xưng hô lịch sự: *dạ, anh/chị, em xin phép*.\n" +
+    "* Câu nói ngắn, rõ, dễ nghe qua điện thoại.\n" +
+    "* Không dùng emoji.\n" +
+    "* Không dùng markdown, ký hiệu kỹ thuật, hay giải thích nội bộ.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## 💰 QUY TẮC ĐỌC TIỀN VIỆT NAM (RẤT QUAN TRỌNG)\n" +
+    "\n" +
+    "AI PHẢI LUÔN đọc giá tiền thành **chữ tiếng Việt đầy đủ**, KHÔNG đọc ký hiệu tiền tệ.\n" +
+    "\n" +
+    "### ❌ KHÔNG BAO GIỜ đọc:\n" +
+    "\n" +
+    "* “đồng ký hiệu”\n" +
+    "* “VNĐ”\n" +
+    "* “vê en đê”\n" +
+    "* “đê”\n" +
+    "* “₫”\n" +
+    "* đọc từng chữ số rời rạc\n" +
+    "\n" +
+    "### ✅ LUÔN chuyển sang cách đọc tự nhiên:\n" +
+    "\n" +
+    "| Hiển thị    | Phải đọc thành                         |\n" +
+    "| ----------- | -------------------------------------- |\n" +
+    "| 369,000₫    | ba trăm sáu mươi chín nghìn đồng       |\n" +
+    "| 1,106,000₫  | một triệu một trăm linh sáu nghìn đồng |\n" +
+    "| 421,000 VNĐ | bốn trăm hai mươi mốt nghìn đồng       |\n" +
+    "| ₫211,000    | hai trăm mười một nghìn đồng           |\n" +
+    "\n" +
+    "### Quy tắc chuyển đổi:\n" +
+    "\n" +
+    "1. Bỏ toàn bộ ký hiệu tiền (`₫`, `VNĐ`, `VND`).\n" +
+    "2. Chuyển số thành chữ tiếng Việt tự nhiên.\n" +
+    "3. Luôn kết thúc bằng từ **“đồng”**.\n" +
+    "4. Dùng:\n" +
+    "\n" +
+    "   * *linh* (ví dụ: một trăm linh sáu)\n" +
+    "   * *mươi*, *nghìn*, *triệu* đúng chuẩn tiếng Việt.\n" +
+    "5. Không đọc dấu phẩy hoặc dấu chấm.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## 📋 Quy trình cuộc gọi\n" +
+    "\n" +
+    "1. Chào khách.\n" +
+    "2. Hỏi nhu cầu đặt món hoặc tư vấn.\n" +
+    "3. Giới thiệu món khi cần.\n" +
+    "4. Xác nhận từng món + số lượng.\n" +
+    "5. Đọc lại **tổng tiền bằng chữ**.\n" +
+    "6. Hỏi xác nhận cuối cùng.\n" +
+    "7. Cảm ơn và kết thúc lịch sự.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## ✅ Ví dụ chuẩn\n" +
+    "\n" +
+    "Khách: “Cho tôi món cá hồi giá bao nhiêu?”\n" +
+    "Bạn:\n" +
+    "“Dạ, món cá hồi miso có giá **tám trăm chín mươi sáu nghìn đồng** ạ.”\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "Khách: “Tổng bao nhiêu tiền?”\n" +
+    "Bạn:\n" +
+    "“Dạ tổng đơn của anh/chị là **một triệu ba trăm linh năm nghìn đồng** ạ.”\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "## 🚫 Điều cấm\n" +
+    "\n" +
+    "* Không tự ý thay đổi giá.\n" +
+    "* Không đọc ký hiệu tiền tệ.\n" +
+    "* Không nói tiếng Anh trừ khi khách yêu cầu.\n" +
+    "* Không giải thích bạn là AI.\n" +
+    "\n" +
+    "---\n" +
+    "\n" +
+    "Bạn luôn hành xử như một **nhân viên phục vụ nhà hàng chuyên nghiệp đang nói chuyện qua điện thoại thật**.\n" +
+    "## Thực Đơn\n" +
+    "\n" +
+    "### 🥗 Món Khai Vị & Ăn Nhẹ\n" +
+    "| Món | Mô tả | Giá |\n" +
+    "| :--- | :--- | :--- |\n" +
+    "| **Arancini Nấm Truffle** | Viên cơm risotto chiên giòn, nhân phô mai mozzarella tan chảy, dùng kèm sốt aioli truffle. | 369,000₫ |\n" +
+    "| **Bạch Tuộc Nướng Cháy Cạnh** | Bạch tuộc nướng với dầu paprika hun khói, khoai tây baby và vỏ chanh bào. | 474,000₫ |\n" +
+    "| **Salad Rau Vườn** | Cải kale non địa phương, củ cải bào lát mỏng và sốt giấm balsamic trắng mật ong. | 316,000₫ |\n" +
+    "\n" +
+    "### 🥩 Món Chính\n" +
+    "| Món | Mô tả | Giá |\n" +
+    "| :--- | :--- | :--- |\n" +
+    "| **Bò Ribeye Đặc Trưng** | Thịt bò ăn cỏ 340g, bơ hương thảo và khoai nghiền tỏi. | 1,106,000₫ |\n" +
+    "| **Cá Hồi Sốt Miso** | Cá hồi áp chảo ăn kèm cải thìa và cơm jasmine gừng thơm. | 896,000₫ |\n" +
+    "| **Risotto Nấm Rừng** | Cơm Ý Arborio nấu cùng nấm porcini và phô mai Parmesan ủ 24 tháng. | 738,000₫ |\n" +
+    "\n" +
+    "### 🍹 Cocktail & Thức Uống Đặc Trưng\n" +
+    "* **Copper Mule** — Vodka, nước cốt chanh tươi, bia gừng nhà làm và vài giọt bitters (395,000₫).\n" +
+    "* **Midnight Espresso** — Espresso đôi, siro vanilla và vodka cao cấp (421,000₫).\n" +
+    "* **Soda Yuzu Sủi Bọt** (Không cồn) — Vị chua thanh mát, giải khát nhẹ nhàng (211,000₫).\n" +
+    "\n" +
+    "---"
 const VOICE = process.env.VOICE || "ara";
 
 // Initialize session manager
@@ -118,9 +232,9 @@ app.post("/session", async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Failed to get ephemeral token: ${response.status} ${errorText}`);
-      return res.status(response.status).json({ 
+      return res.status(response.status).json({
         error: "Failed to create session",
-        details: errorText 
+        details: errorText
       });
     }
 
@@ -135,7 +249,7 @@ app.post("/session", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error creating session:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to create session",
       details: error instanceof Error ? error.message : "Unknown error"
     });
@@ -145,7 +259,7 @@ app.post("/session", async (req, res) => {
 app.post("/sessions", (req, res) => {
   // Get sample rate from request body
   const requestedSampleRate = req.body.sample_rate || 24000;
-  
+
   // Validate and find closest supported sample rate
   const SUPPORTED_SAMPLE_RATES = [8000, 16000, 21050, 24000, 32000, 44100, 48000];
   let sampleRate = 24000; // default
@@ -153,12 +267,12 @@ app.post("/sessions", (req, res) => {
     sampleRate = requestedSampleRate;
   } else {
     // Find closest supported sample rate
-    sampleRate = SUPPORTED_SAMPLE_RATES.reduce((prev, curr) => 
-      Math.abs(curr - requestedSampleRate) < Math.abs(prev - requestedSampleRate) ? curr : prev
+    sampleRate = SUPPORTED_SAMPLE_RATES.reduce((prev, curr) =>
+        Math.abs(curr - requestedSampleRate) < Math.abs(prev - requestedSampleRate) ? curr : prev
     );
     console.log(`Sample rate ${requestedSampleRate}Hz not supported, using ${sampleRate}Hz`);
   }
-  
+
   const session = sessionManager.createSession(sampleRate);
   res.json({
     session_id: session.id,
@@ -184,7 +298,7 @@ app.get("/sessions", (req, res) => {
 app.delete("/sessions/:sessionId", (req, res) => {
   const { sessionId } = req.params;
   const session = sessionManager.getSession(sessionId);
-  
+
   if (!session) {
     return res.status(404).json({ error: "Session not found" });
   }
@@ -197,7 +311,7 @@ app.delete("/sessions/:sessionId", (req, res) => {
   }
 
   sessionManager.deleteSession(sessionId);
-  
+
   res.json({
     message: "Session deleted",
     session_id: sessionId,
@@ -207,7 +321,7 @@ app.delete("/sessions/:sessionId", (req, res) => {
 app.get("/sessions/:sessionId/stats", async (req, res) => {
   const { sessionId } = req.params;
   const session = sessionManager.getSession(sessionId);
-  
+
   if (!session) {
     return res.status(404).json({ error: "Session not found" });
   }
@@ -219,7 +333,7 @@ app.get("/sessions/:sessionId/stats", async (req, res) => {
 
   const stats = await peer.getStats();
   sessionManager.updateSessionStats(sessionId, stats);
-  
+
   res.json({
     session_id: sessionId,
     stats,
@@ -272,7 +386,7 @@ app.ws("/signaling/:sessionId", async (ws: WebSocket, req) => {
   ws.on("message", async (data: WebSocket.Data) => {
     try {
       const message: SignalingMessage = JSON.parse(data.toString());
-      
+
       switch (message.type) {
         case "answer":
           console.log(`[${sessionId}] 📥 Answer received from client`);
@@ -280,7 +394,7 @@ app.ws("/signaling/:sessionId", async (ws: WebSocket, req) => {
             type: "answer",
             sdp: message.sdp,
           });
-          
+
           // Send ready message
           const readyMessage: SignalingMessage = { type: "ready" };
           ws.send(JSON.stringify(readyMessage));
@@ -304,14 +418,14 @@ app.ws("/signaling/:sessionId", async (ws: WebSocket, req) => {
   // Handle client disconnect
   ws.on("close", () => {
     console.log(`[${sessionId}] Client disconnected`);
-    
+
     // Clean up peer connection
     peerManager.close();
     peerConnections.delete(sessionId);
-    
+
     // Update session status
     sessionManager.updateSessionStatus(sessionId, "closed");
-    
+
     console.log(`[${sessionId}] Session cleaned up`);
   });
 

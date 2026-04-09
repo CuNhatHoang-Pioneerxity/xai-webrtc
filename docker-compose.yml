@@ -1,17 +1,25 @@
 services:
   vite-app:
+    image: poineerxitydev/omni:omni-vite
     build:
       context: ./client
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     ports:
-      - "3000:80"
+      - "3030:80"
 
   express-app:
+    image: poineerxitydev/omni:omni-express
     build:
       context: ./server
       dockerfile: Dockerfile
-    env_file:
-      - server/.env
-    ports:
-      - "8000:8000"
-      - "10000-10100:10000-10100/udp"
+    environment:
+      - NODE_ENV=production
+      - XAI_API_KEY=${XAI_API_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - ENABLE_TURN=${ENABLE_TURN}
+#    ports:
+#      - "8000:8000"
+#      - "10000-10100:10000-10100/udp"
+    network_mode: "host"
