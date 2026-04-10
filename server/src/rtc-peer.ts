@@ -32,6 +32,7 @@ export class RTCPeerManager {
   private xaiClient: XAIClient;
   private audioProcessor: AudioProcessor;
   private config: RTCPeerConfig;
+  private xaiReady = false;
   private stats: WebRTCStats = {
     bitrate: { audio_in: 0, audio_out: 0 },
     jitter: 0,
@@ -153,6 +154,7 @@ export class RTCPeerManager {
 
     this.pc.ondatachannel = (event) => {
       console.log(`[${sessionId}] 📡 DataChannel received from client`);
+      console.log(`[${sessionId}] 📡 Ready state: [${event.channel.readyState}]`);
       this.dataChannel = event.channel;
       this.setupDataChannelHandlers();
     };
@@ -174,6 +176,7 @@ export class RTCPeerManager {
     });
 
     console.log(`[${sessionId}] 📡 DataChannel created`);
+    console.log(`[${sessionId}] 📡 Ready state: [${this.dataChannel.readyState}]`);
     this.setupDataChannelHandlers();
   }
 
@@ -185,6 +188,7 @@ export class RTCPeerManager {
 
     this.dataChannel!.onopen = () => {
       console.log(`[${sessionId}] ✅ DataChannel opened`);
+      this.notifyXaiReadyIfNeeded();
     };
 
     this.dataChannel!.onclose = () => {
@@ -246,17 +250,27 @@ export class RTCPeerManager {
 
     // Set up ready handler - notify client when XAI is ready for audio
     this.xaiClient.setReadyHandler(() => {
-      console.log(`[${sessionId}] 📢 Notifying client that XAI is ready for audio`);
-      if (this.dataChannel && this.dataChannel.readyState === "open") {
-        this.dataChannel.send(JSON.stringify({
-          type: "xai.ready",
-          message: "XAI session configured, ready for audio input",
-        }));
-      }
+      console.log(`[${sessionId}] 📢 XAI is ready for audio (dataChannel readyState: ${this.dataChannel?.readyState})`);
+      this.xaiReady = true;
+      this.notifyXaiReadyIfNeeded();
     });
 
     // Connect to XAI API
     await this.xaiClient.connect();
+  }
+
+  /**
+   * Send xai.ready notification if both XAI and DataChannel are ready
+   */
+  private notifyXaiReadyIfNeeded(): void {
+    const { sessionId } = this.config;
+    if (this.xaiReady && this.dataChannel && this.dataChannel.readyState === "open") {
+      console.log(`[${sessionId}] 📢✅ Client Notified (XAI ready + DataChannel open)`);
+      this.dataChannel.send(JSON.stringify({
+        type: "xai.ready",
+        message: "XAI session configured, ready for audio input",
+      }));
+    }
   }
 
   /**

@@ -32,13 +32,12 @@ export function useAudioStream(): UseAudioStreamReturn {
 
   // Initialize audio context with native sample rate
   const getAudioContext = useCallback(() => {
-    if (!audioContextRef.current) {
-      // Let browser choose native sample rate for optimal performance
-      audioContextRef.current = new AudioContext();
-      const nativeSampleRate = audioContextRef.current.sampleRate;
-      setSampleRate(nativeSampleRate);
-      console.log(`Audio context initialized with native sample rate: ${nativeSampleRate}Hz`);
-    }
+    // Let browser choose native sample rate for optimal performance
+    audioContextRef.current = new AudioContext();
+    const nativeSampleRate = audioContextRef.current.sampleRate;
+    setSampleRate(nativeSampleRate);
+    console.log(`Audio context initialized with native sample rate: ${nativeSampleRate}Hz`);
+
     return audioContextRef.current;
   }, []);
 
@@ -48,7 +47,8 @@ export function useAudioStream(): UseAudioStreamReturn {
       // Initialize audio context first to get native sample rate
       const audioContext = getAudioContext();
       const nativeSampleRate = audioContext.sampleRate;
-      
+
+      console.log("Request microphone access with native sample rate: before")
       // Request microphone access with native sample rate
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -59,7 +59,7 @@ export function useAudioStream(): UseAudioStreamReturn {
           autoGainControl: true,
         },
       });
-
+      console.log("Request microphone access with native sample rate: After")
       mediaStreamRef.current = stream;
       
       // Resume context if suspended
@@ -143,7 +143,7 @@ export function useAudioStream(): UseAudioStreamReturn {
   }, [getAudioContext]);
 
   // Stop audio capture
-  const stopCapture = useCallback(() => {
+  const stopCapture = useCallback(async () => {
     if (processorNodeRef.current) {
       processorNodeRef.current.disconnect();
       processorNodeRef.current = null;
@@ -157,6 +157,11 @@ export function useAudioStream(): UseAudioStreamReturn {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      await audioContextRef.current.close();
+      audioContextRef.current = null;
     }
 
     setIsCapturing(false);

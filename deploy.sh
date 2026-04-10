@@ -2,6 +2,7 @@
 # Configuration
 SSH_KEY=~/.ssh/pioneerxity
 DROPLET_IP=143.198.84.169
+
 set -e
 
 echo "=========================================="
